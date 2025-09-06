@@ -31,14 +31,25 @@ const tones = [
   { value: "dramatic", label: "Dramatic", color: "red" },
   { value: "lighthearted", label: "Lighthearted", color: "green" }
 ];
-
+interface ParameterControlsProps {
+  parameters: {
+    genre: string;
+    tone: string;
+    length: string;
+    title?: string;
+  };
+  onParameterChange: (param: string, value: string) => void;
+  customPrompt: string;
+  onCustomPromptChange: (value: string) => void;
+  className?: string;
+}
 export default function ParameterControls({ 
   parameters, 
   onParameterChange, 
   customPrompt,
   onCustomPromptChange,
   className = "" 
-}) {
+}: ParameterControlsProps) {
   return (
     <div className={`space-y-6 ${className}`}>
       <div className="flex items-center gap-2 mb-6">
@@ -58,7 +69,7 @@ export default function ParameterControls({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Select value={parameters.genre} onValueChange={(value) => onParameterChange('genre', value)}>
+            <Select value={parameters.genre} onValueChange={(value:string) => onParameterChange('genre', value)}>
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                 <SelectValue placeholder="Choose a genre" />
               </SelectTrigger>
@@ -85,7 +96,7 @@ export default function ParameterControls({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Select value={parameters.tone} onValueChange={(value) => onParameterChange('tone', value)}>
+            <Select value={parameters.tone} onValueChange={(value:string) => onParameterChange('tone', value)}>
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                 <SelectValue placeholder="Select tone" />
               </SelectTrigger>
@@ -109,7 +120,7 @@ export default function ParameterControls({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Select value={parameters.length} onValueChange={(value) => onParameterChange('length', value)}>
+            <Select value={parameters.length} onValueChange={(value:string) => onParameterChange('length', value)}>
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                 <SelectValue placeholder="Choose length" />
               </SelectTrigger>

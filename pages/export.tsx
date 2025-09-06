@@ -8,7 +8,7 @@ import {
   Settings
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Character, DialogueGraph, DialogueNode, GameVariable, Lore } from "@/entities/all";
+import { Character as CharacterEntity, DialogueGraph as DialogueGraphEntity, DialogueNode as DialogueNodeEntity } from "@/entities/all";
 import React, { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -16,12 +16,47 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
 
+// --- START: 타입 정의 추가 ---
+
+interface DialogueGraph {
+  id: string;
+  title?: string;
+  description?: string;
+  category?: string;
+}
+
+interface Character {
+  id: string;
+  name?: string;
+  description?: string;
+  personality?: string;
+  voice_style?: string;
+  role?: string;
+}
+
+interface DialogueNode {
+  id?: string;
+  graph_id: string;
+  node_id: string;
+  type: 'start' | 'dialogue' | 'choice' | 'condition' | 'action' | 'end';
+  position: { x: number; y: number };
+  content?: string;
+  character_id?: string;
+  connections?: string[];
+  conditions?: any[];
+  consequences?: any[];
+  choices?: string[];
+}
+
+// --- END: 타입 정의 추가 ---
+
+
 export default function Export() {
-  const [graphs, setGraphs] = useState([]);
-  const [characters, setCharacters] = useState([]);
-  const [exportData, setExportData] = useState(null);
+  const [graphs, setGraphs] = useState<DialogueGraph[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [exportData, setExportData] = useState<string | null>(null);
   const [exportFormat, setExportFormat] = useState("unity");
-  const [selectedGraphs, setSelectedGraphs] = useState([]);
+  const [selectedGraphs, setSelectedGraphs] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
@@ -31,19 +66,19 @@ export default function Export() {
   const loadData = async () => {
     try {
       const [graphsData, charactersData] = await Promise.all([
-        DialogueGraph.list("-created_date"),
-        Character.list()
+        DialogueGraphEntity.list("-created_date"),
+        CharacterEntity.list()
       ]);
       
-      setGraphs(graphsData);
-      setCharacters(charactersData);
+      setGraphs(graphsData as DialogueGraph[]);
+      setCharacters(charactersData as Character[]);
     } catch (error) {
       console.error("Error loading data:", error);
     }
   };
 
-  const generateUnityFormat = async (graphIds) => {
-    const exportObject = {
+  const generateUnityFormat = async (graphIds: string[]) => {
+    const exportObject: any = {
       metadata: {
         generator: "NarrativeAI Engine",
         version: "1.0",
@@ -55,7 +90,7 @@ export default function Export() {
     };
 
     // Add characters
-    characters.forEach(character => {
+    characters.forEach((character: Character) => {
       exportObject.characters[character.id] = {
         name: character.name,
         description: character.description,
@@ -68,8 +103,10 @@ export default function Export() {
     // Add selected dialogue graphs with their nodes
     for (const graphId of graphIds) {
       const graph = graphs.find(g => g.id === graphId);
-      const nodes = await DialogueNode.filter({ graph_id: graphId });
+      const nodes = await DialogueNodeEntity.filter({ graph_id: graphId }) as DialogueNode[];
       
+      if (!graph) continue;
+
       exportObject.dialogues[graphId] = {
         title: graph.title,
         description: graph.description,
@@ -77,7 +114,7 @@ export default function Export() {
         nodes: {}
       };
 
-      nodes.forEach(node => {
+      nodes.forEach((node: DialogueNode) => {
         exportObject.dialogues[graphId].nodes[node.node_id] = {
           type: node.type,
           character_id: node.character_id,
@@ -94,8 +131,8 @@ export default function Export() {
     return exportObject;
   };
 
-  const generateGodotFormat = async (graphIds) => {
-    const exportObject = {
+  const generateGodotFormat = async (graphIds: string[]) => {
+    const exportObject: any = {
       metadata: {
         generator: "NarrativeAI Engine",
         version: "1.0",
@@ -107,7 +144,7 @@ export default function Export() {
     };
 
     // Add characters
-    characters.forEach(character => {
+    characters.forEach((character: Character) => {
       exportObject.characters[character.id] = {
         name: character.name,
         description: character.description,
@@ -120,8 +157,20 @@ export default function Export() {
     // Add dialogue graphs in Godot format
     for (const graphId of graphIds) {
       const graph = graphs.find(g => g.id === graphId);
-      const nodes = await DialogueNode.filter({ graph_id: graphId });
+      const nodes = await DialogueNodeEntity.filter({ graph_id: graphId }) as DialogueNode[];
       
+      if (!graph) continue;
+
+      interface GodotNode {
+        type: 'start' | 'dialogue' | 'choice' | 'condition' | 'action' | 'end';
+        character_id?: string;
+        content?: string;
+        next_id?: string | null;
+        conditions: any[];
+        consequences: any[];
+        choices?: { text: string; next_id: string | null }[];
+      }
+
       exportObject.dialogues[graphId] = {
         title: graph.title,
         description: graph.description,
@@ -129,8 +178,8 @@ export default function Export() {
         nodes: {}
       };
 
-      nodes.forEach(node => {
-        const godotNode = {
+      nodes.forEach((node: DialogueNode) => {
+        const godotNode: GodotNode = {
           type: node.type,
           character_id: node.character_id,
           content: node.content,
@@ -189,17 +238,31 @@ export default function Export() {
     URL.revokeObjectURL(url);
   };
 
-  const copyToClipboard = async () => {
+  const copyToClipboard = () => {
     if (!exportData) return;
     
+    // Create a temporary textarea to use the deprecated execCommand for broader compatibility (e.g., in iframes)
+    const textArea = document.createElement("textarea");
+    textArea.value = exportData;
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
     try {
-      await navigator.clipboard.writeText(exportData);
-    } catch (error) {
-      console.error("Failed to copy:", error);
+      document.execCommand('copy');
+      // You can add a success notification here (e.g., a toast message)
+    } catch (err) {
+      console.error("Failed to copy text: ", err);
     }
+
+    document.body.removeChild(textArea);
   };
 
-  const toggleGraphSelection = (graphId) => {
+  const toggleGraphSelection = (graphId: string) => {
     setSelectedGraphs(prev => 
       prev.includes(graphId)
         ? prev.filter(id => id !== graphId)

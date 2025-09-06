@@ -9,13 +9,33 @@ import {
   Zap
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Character, DialogueGraph, GameVariable, Lore } from "@/entities/all";
+import { Character, DialogueGraph as DialogueGraphEntity, GameVariable, Lore } from "@/entities/all";
 import React, { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { createPageUrl } from "@/utils";
 import { motion } from "framer-motion";
+
+// --- START: 타입 정의 추가 ---
+
+// API 응답 데이터의 형태를 정의합니다.
+interface DialogueGraph {
+  id: string;
+  title: string;
+  category?: string;
+}
+
+// statCards 배열 요소의 타입을 정의합니다.
+interface StatCard {
+  title: string;
+  value: number;
+  icon: React.ElementType; // Lucide 아이콘과 같은 컴포넌트 타입
+  color: string;
+  link: string;
+}
+
+// --- END: 타입 정의 추가 ---
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -24,7 +44,8 @@ export default function Dashboard() {
     loreEntries: 0,
     variables: 0
   });
-  const [recentDialogues, setRecentDialogues] = useState([]);
+  // useState에 명시적으로 타입을 지정합니다.
+  const [recentDialogues, setRecentDialogues] = useState<DialogueGraph[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -34,27 +55,32 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       const [dialogues, characters, lore, variables] = await Promise.all([
-        DialogueGraph.list("-created_date", 5),
+        DialogueGraphEntity.list("-created_date", 5),
         Character.list(),
         Lore.list(),
         GameVariable.list()
       ]);
 
       setStats({
-        dialogues: dialogues.length,
-        characters: characters.length,
-        loreEntries: lore.length,
-        variables: variables.length
+        // API 응답 결과가 배열이 아닐 수 있으므로 .length 접근 전에 확인하는 것이 안전합니다.
+        dialogues: Array.isArray(dialogues) ? dialogues.length : 0,
+        characters: Array.isArray(characters) ? characters.length : 0,
+        loreEntries: Array.isArray(lore) ? lore.length : 0,
+        variables: Array.isArray(variables) ? variables.length : 0
       });
 
-      setRecentDialogues(dialogues);
+      if (Array.isArray(dialogues)) {
+        setRecentDialogues(dialogues as DialogueGraph[]);
+      }
+      
     } catch (error) {
       console.error("Error loading dashboard data:", error);
     }
     setIsLoading(false);
   };
 
-  const statCards = [
+  // statCards 배열에 타입을 적용합니다.
+  const statCards: StatCard[] = [
     {
       title: "Dialogue Graphs",
       value: stats.dialogues,
@@ -111,7 +137,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
             >
-              <Link to={stat.link}>
+              <Link href={stat.link}>
                 <Card className="bg-slate-800/50 border-slate-700 hover:border-indigo-500/50 transition-all duration-300 cursor-pointer group">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -144,21 +170,21 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link to={createPageUrl("DialogueEditor")}>
+              <Link href={createPageUrl("DialogueEditor")}>
                 <Button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white">
                   <Plus className="w-4 h-4 mr-2" />
                   New Dialogue
                 </Button>
               </Link>
               
-              <Link to={createPageUrl("Codex")}>
+              <Link href={createPageUrl("Codex")}>
                 <Button variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-700">
                   <Users className="w-4 h-4 mr-2" />
                   Add Character
                 </Button>
               </Link>
               
-              <Link to={createPageUrl("Export")}>
+              <Link href={createPageUrl("Export")}>
                 <Button variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-700">
                   <FileText className="w-4 h-4 mr-2" />
                   Export Project
@@ -181,7 +207,7 @@ export default function Dashboard() {
                   <TrendingUp className="w-5 h-5 text-green-400" />
                   Recent Dialogues
                 </CardTitle>
-                <Link to={createPageUrl("DialogueEditor")}>
+                <Link href={createPageUrl("DialogueEditor")}>
                   <Button variant="ghost" className="text-indigo-400 hover:text-indigo-300">
                     View All
                   </Button>
@@ -208,7 +234,7 @@ export default function Dashboard() {
                           <p className="text-sm text-slate-400">{dialogue.category?.replace(/_/g, ' ')}</p>
                         </div>
                       </div>
-                      <Link to={`${createPageUrl("DialogueEditor")}?graph=${dialogue.id}`}>
+                      <Link href={`${createPageUrl("DialogueEditor")}?graph=${dialogue.id}`}>
                         <Button size="sm" variant="ghost" className="text-indigo-400 hover:text-indigo-300">
                           Edit
                         </Button>
@@ -221,7 +247,7 @@ export default function Dashboard() {
                   <GitBranch className="w-16 h-16 mx-auto mb-4 opacity-50" />
                   <h3 className="text-lg font-medium mb-2">No dialogues yet</h3>
                   <p className="text-sm mb-4">Create your first dialogue graph to get started</p>
-                  <Link to={createPageUrl("DialogueEditor")}>
+                  <Link href={createPageUrl("DialogueEditor")}>
                     <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white">
                       <Plus className="w-4 h-4 mr-2" />
                       Create First Dialogue

@@ -11,13 +11,39 @@ import React, { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { Template } from "@/entities/Template";
+import Link from "next/link";
+import { Template as TemplateEntity } from "@/entities/Template";
 import { createPageUrl } from "@/utils";
 import { motion } from "framer-motion";
 
+// --- START: 타입 정의 추가 ---
+
+type TextType =
+  | "dialogue"
+  | "item_description"
+  | "character_name"
+  | "location_description"
+  | "quest_text"
+  | "lore"
+  | "story_snippet"
+  | "ui_text"
+  | "combat_text"
+  | "other";
+
+interface Template {
+  id: string;
+  name: string;
+  description: string;
+  prompt_template: string;
+  text_type: TextType;
+  suggested_genre?: string;
+  is_popular: boolean;
+}
+
+// --- END: 타입 정의 추가 ---
+
 export default function Templates() {
-  const [templates, setTemplates] = useState([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -25,17 +51,18 @@ export default function Templates() {
   }, []);
 
   const loadTemplates = async () => {
+    setIsLoading(true);
     try {
-      const fetchedTemplates = await Template.list("-is_popular");
-      setTemplates(fetchedTemplates);
+      const fetchedTemplates = await TemplateEntity.list("-is_popular");
+      setTemplates(fetchedTemplates as Template[]);
     } catch (error) {
       console.error("Error loading templates:", error);
     }
     setIsLoading(false);
   };
 
-  const getTypeColor = (type) => {
-    const colors = {
+  const getTypeColor = (type: TextType) => {
+    const colors: Record<TextType, string> = {
       dialogue: "from-blue-400 to-blue-600",
       item_description: "from-purple-400 to-purple-600",
       character_name: "from-green-400 to-green-600",
@@ -75,7 +102,7 @@ export default function Templates() {
                 <p className="text-slate-400 mb-6">
                   We're working on creating awesome templates to make your content generation even easier.
                 </p>
-                <Link to={createPageUrl("Generator")}>
+                <Link href={createPageUrl("Generator")}>
                   <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white">
                     <ArrowRight className="w-5 h-5 mr-2" />
                     Start Generating Now
@@ -115,48 +142,46 @@ export default function Templates() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <Card className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300 h-full group">
+              <Card className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300 h-full group flex flex-col">
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-white text-lg">
-                          {template.name}
-                        </CardTitle>
-                        {template.is_popular && (
-                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                        )}
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <Badge 
-                          className={`bg-gradient-to-r ${getTypeColor(template.text_type)} text-white border-0`}
-                        >
-                          {template.text_type?.replace(/_/g, ' ')}
-                        </Badge>
-                        
-                        {template.suggested_genre && (
-                          <Badge variant="secondary" className="bg-slate-700 text-slate-300">
-                            {template.suggested_genre?.replace(/_/g, ' ')}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <p className="text-slate-400 text-sm leading-relaxed">
-                        {template.description}
-                      </p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CardTitle className="text-white text-lg">
+                        {template.name}
+                      </CardTitle>
+                      {template.is_popular && (
+                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                      )}
                     </div>
+                    
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <Badge 
+                        className={`bg-gradient-to-r ${getTypeColor(template.text_type)} text-white border-0`}
+                      >
+                        {template.text_type?.replace(/_/g, ' ')}
+                      </Badge>
+                      
+                      {template.suggested_genre && (
+                        <Badge variant="secondary" className="bg-slate-700 text-slate-300">
+                          {template.suggested_genre?.replace(/_/g, ' ')}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    <p className="text-slate-400 text-sm leading-relaxed">
+                      {template.description}
+                    </p>
                   </div>
                 </CardHeader>
                 
-                <CardContent className="pt-0">
+                <CardContent className="pt-0 flex-1 flex flex-col justify-between">
                   <div className="bg-slate-900/50 rounded-lg p-4 mb-4 border border-slate-700">
                     <p className="text-slate-300 text-xs font-mono leading-relaxed line-clamp-3">
                       {template.prompt_template}
                     </p>
                   </div>
                   
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mt-auto">
                     <div className="flex items-center gap-4 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -168,7 +193,7 @@ export default function Templates() {
                       </span>
                     </div>
                     
-                    <Link to={createPageUrl("Generator")}>
+                    <Link href={`${createPageUrl("Generator")}?template=${template.id}`}>
                       <Button 
                         size="sm"
                         className="bg-purple-600 hover:bg-purple-700 text-white group-hover:bg-gradient-to-r group-hover:from-purple-600 group-hover:to-blue-600 transition-all duration-300"

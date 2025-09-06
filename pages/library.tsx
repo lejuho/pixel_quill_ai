@@ -3,8 +3,6 @@ import {
   Calendar,
   Copy,
   Download,
-  Filter,
-  Heart,
   Palette,
   Search,
   Trash2,
@@ -16,12 +14,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { GeneratedText } from "@/entities/GeneratedText";
+import { GeneratedText as GeneratedTextEntity } from "@/entities/GeneratedText";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 
+// --- START: 타입 정의 추가 ---
+
+type TextType =
+  | "dialogue"
+  | "item_description"
+  | "character_name"
+  | "location_description"
+  | "quest_text"
+  | "lore"
+  | "story_snippet"
+  | "ui_text"
+  | "combat_text"
+  | "other";
+
+interface GeneratedText {
+  id: string;
+  title: string;
+  content: string;
+  text_type: TextType;
+  genre: string;
+  created_date: string; // ISO date string
+}
+
+// --- END: 타입 정의 추가 ---
+
 export default function Library() {
-  const [texts, setTexts] = useState([]);
+  const [texts, setTexts] = useState<GeneratedText[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterGenre, setFilterGenre] = useState("all");
@@ -31,56 +54,65 @@ export default function Library() {
   const loadTexts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetchedTexts = await GeneratedText.list(`-${sortBy}`);
-      setTexts(fetchedTexts);
+      const fetchedTexts = await GeneratedTextEntity.list(`-${sortBy}`);
+      setTexts(fetchedTexts as unknown as GeneratedText[]);
     } catch (error) {
       console.error("Error loading texts:", error);
     }
     setIsLoading(false);
-  }, [sortBy]); // `sortBy` is a dependency of `loadTexts`
+  }, [sortBy]);
 
   useEffect(() => {
     loadTexts();
-  }, [loadTexts]); // `loadTexts` is a dependency of `useEffect`
+  }, [loadTexts]);
 
   const filteredTexts = texts.filter(text => {
     const matchesSearch = text.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         text.content?.toLowerCase().includes(searchTerm.toLowerCase());
+                          text.content?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === "all" || text.text_type === filterType;
     const matchesGenre = filterGenre === "all" || text.genre === filterGenre;
     
     return matchesSearch && matchesType && matchesGenre;
   });
 
-  const handleCopy = async (content) => {
+  const handleCopy = (content: string) => {
+    if (!content) return;
+    const textArea = document.createElement("textarea");
+    textArea.value = content;
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
     try {
-      await navigator.clipboard.writeText(content);
-    } catch (error) {
-      console.error("Failed to copy text:", error);
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback: Oops, unable to copy', err);
     }
+    document.body.removeChild(textArea);
   };
 
-  const handleExport = (text) => {
+  const handleExport = (text: GeneratedText) => {
     const element = document.createElement("a");
     const file = new Blob([text.content], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
-    element.download = `${text.title || 'generated-text'}.txt`;
+    element.download = `${text.title.replace(/\s+/g, '_') || 'generated-text'}.txt`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     try {
-      await GeneratedText.delete(id);
+      await GeneratedTextEntity.delete(id);
       setTexts(prev => prev.filter(text => text.id !== id));
     } catch (error) {
       console.error("Error deleting text:", error);
     }
   };
 
-  const getTypeColor = (type) => {
-    const colors = {
+  const getTypeColor = (type: TextType) => {
+    const colors: Record<TextType, string> = {
       dialogue: "from-blue-400 to-blue-600",
       item_description: "from-purple-400 to-purple-600",
       character_name: "from-green-400 to-green-600",
@@ -129,7 +161,7 @@ export default function Library() {
               </div>
               
               <div className="flex gap-3">
-                <Select value={filterType} onValueChange={setFilterType}>
+                <Select value={filterType} onValueChange={(value: string) => setFilterType(value)}>
                   <SelectTrigger className="w-40 bg-slate-700 border-slate-600 text-white">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
@@ -148,7 +180,7 @@ export default function Library() {
                   </SelectContent>
                 </Select>
 
-                <Select value={filterGenre} onValueChange={setFilterGenre}>
+                <Select value={filterGenre} onValueChange={(value: string) => setFilterGenre(value)}>
                   <SelectTrigger className="w-40 bg-slate-700 border-slate-600 text-white">
                     <SelectValue placeholder="Genre" />
                   </SelectTrigger>
@@ -167,7 +199,7 @@ export default function Library() {
                   </SelectContent>
                 </Select>
 
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select value={sortBy} onValueChange={(value: string) => setSortBy(value)}>
                   <SelectTrigger className="w-40 bg-slate-700 border-slate-600 text-white">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
@@ -192,41 +224,39 @@ export default function Library() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
               >
-                <Card className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300 h-full">
+                <Card className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-all duration-300 h-full flex flex-col">
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-white text-lg mb-2 truncate">
-                          {text.title || "Untitled"}
-                        </CardTitle>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          <Badge 
-                            className={`bg-gradient-to-r ${getTypeColor(text.text_type)} text-white border-0`}
-                          >
-                            <Type className="w-3 h-3 mr-1" />
-                            {text.text_type?.replace(/_/g, ' ')}
-                          </Badge>
-                          <Badge variant="secondary" className="bg-slate-700 text-slate-300">
-                            <Palette className="w-3 h-3 mr-1" />
-                            {text.genre?.replace(/_/g, ' ')}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center text-xs text-slate-400">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          {format(new Date(text.created_date), "MMM d, yyyy")}
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-white text-lg mb-2 truncate">
+                        {text.title || "Untitled"}
+                      </CardTitle>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <Badge 
+                          className={`bg-gradient-to-r ${getTypeColor(text.text_type)} text-white border-0`}
+                        >
+                          <Type className="w-3 h-3 mr-1" />
+                          {text.text_type?.replace(/_/g, ' ')}
+                        </Badge>
+                        <Badge variant="secondary" className="bg-slate-700 text-slate-300">
+                          <Palette className="w-3 h-3 mr-1" />
+                          {text.genre?.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center text-xs text-slate-400">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {format(new Date(text.created_date), "MMM d, yyyy")}
                       </div>
                     </div>
                   </CardHeader>
                   
-                  <CardContent className="pt-0">
-                    <div className="bg-slate-900/50 rounded-lg p-4 mb-4 border border-slate-700">
+                  <CardContent className="pt-0 flex-1 flex flex-col">
+                    <div className="bg-slate-900/50 rounded-lg p-4 mb-4 border border-slate-700 flex-1">
                       <p className="text-slate-200 text-sm leading-relaxed line-clamp-4 font-mono">
                         {text.content}
                       </p>
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mt-auto">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -281,3 +311,4 @@ export default function Library() {
     </div>
   );
 }
+

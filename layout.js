@@ -1,5 +1,4 @@
 import { BookOpen, Brain, Download, GitBranch, LayoutDashboard } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -15,8 +14,10 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
+import Link from "next/link";
 import React from "react";
 import { createPageUrl } from "@/utils";
+import { useRouter } from "next/router";
 
 const navigationItems = [
   {
@@ -42,61 +43,10 @@ const navigationItems = [
 ];
 
 export default function Layout({ children, currentPageName }) {
-  const location = useLocation();
+  const router = useRouter();
 
   return (
     <SidebarProvider>
-      <style jsx>{`
-        :root {
-          --background: 8 8 16;
-          --foreground: 248 250 252;
-          --card: 15 23 42;
-          --card-foreground: 248 250 252;
-          --popover: 15 23 42;
-          --popover-foreground: 248 250 252;
-          --primary: 99 102 241;
-          --primary-foreground: 248 250 252;
-          --secondary: 30 41 59;
-          --secondary-foreground: 203 213 225;
-          --muted: 30 41 59;
-          --muted-foreground: 148 163 184;
-          --accent: 67 56 202;
-          --accent-foreground: 241 245 249;
-          --destructive: 239 68 68;
-          --destructive-foreground: 248 250 252;
-          --border: 30 41 59;
-          --input: 30 41 59;
-          --ring: 99 102 241;
-        }
-        
-        * {
-          border-color: hsl(var(--border));
-        }
-        
-        body {
-          color: hsl(var(--foreground));
-          background: linear-gradient(135deg, rgb(8, 8, 16) 0%, rgb(15, 23, 42) 50%, rgb(8, 8, 16) 100%);
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-        
-        .glass-effect {
-          background: rgba(30, 41, 59, 0.4);
-          backdrop-filter: blur(16px);
-          border: 1px solid rgba(99, 102, 241, 0.2);
-        }
-        
-        .glow {
-          box-shadow: 0 0 24px rgba(99, 102, 241, 0.4);
-        }
-        
-        .node-editor {
-          background: 
-            radial-gradient(circle at 25px 25px, rgba(99, 102, 241, 0.1) 2px, transparent 2px),
-            radial-gradient(circle at 75px 75px, rgba(67, 56, 202, 0.1) 2px, transparent 2px);
-          background-size: 100px 100px;
-        }
-      `}</style>
-      
       <div className="min-h-screen flex w-full bg-slate-950">
         <Sidebar className="border-r border-slate-800 bg-slate-950/90 backdrop-blur-xl">
           <SidebarHeader className="border-b border-slate-800 p-6">
@@ -123,10 +73,10 @@ export default function Layout({ children, currentPageName }) {
                       <SidebarMenuButton 
                         asChild 
                         className={`hover:bg-indigo-500/10 hover:text-indigo-400 transition-all duration-300 rounded-lg mb-1 ${
-                          location.pathname === item.url ? 'bg-indigo-500/20 text-indigo-400 border-l-2 border-indigo-500' : 'text-slate-300'
+                          router.pathname === item.url ? 'bg-indigo-500/20 text-indigo-400 border-l-2 border-indigo-500' : 'text-slate-300'
                         }`}
                       >
-                        <Link to={item.url} className="flex items-center gap-3 px-3 py-3">
+                        <Link href={item.url} className="flex items-center gap-3 px-3 py-3">
                           <item.icon className="w-5 h-5" />
                           <span className="font-medium">{item.title}</span>
                         </Link>

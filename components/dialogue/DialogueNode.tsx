@@ -17,6 +17,40 @@ import { Button } from "@/components/ui/button";
 import React from "react";
 import { motion } from "framer-motion";
 
+// --- TypeScript 타입 정의 시작 ---
+
+// Node 객체의 구조를 정의합니다.
+interface DialogueNodeData {
+  node_id: string;
+  type: 'start' | 'dialogue' | 'choice' | 'condition' | 'action' | 'end';
+  content?: string;
+  position?: { x: number; y: number };
+  connections?: any[]; // 필요에 따라 더 구체적인 타입으로 변경 가능
+  conditions?: any[];  // 필요에 따라 더 구체적인 타입으로 변경 가능
+  consequences?: any[];// 필요에 따라 더 구체적인 타입으로 변경 가능
+}
+
+// Character 객체의 구조를 정의합니다.
+interface CharacterData {
+  name: string;
+}
+
+// DialogueNode 컴포넌트가 받는 props의 타입을 정의합니다.
+interface DialogueNodeProps {
+  node: DialogueNodeData;
+  character?: CharacterData;
+  choices?: string[];
+  isSelected: boolean;
+  isDragging: boolean;
+  isConnecting: boolean;
+  onMouseDown: (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
+  onStartConnection: (nodeId: string, position: { x: number; y: number }, outputIndex: number) => void;
+  onCompleteConnection: (nodeId: string) => void;
+  onEdit: () => void;
+}
+
+// --- TypeScript 타입 정의 끝 ---
+
 const nodeIcons = {
   start: Play,
   dialogue: MessageSquare,
@@ -35,8 +69,8 @@ const nodeColors = {
   end: "from-gray-500 to-slate-500"
 };
 
-export default function DialogueNode({ 
-  node, 
+export default function DialogueNode({
+  node,
   character,
   choices = [],
   isSelected,
@@ -46,26 +80,28 @@ export default function DialogueNode({
   onStartConnection,
   onCompleteConnection,
   onEdit
-}) {
+}: DialogueNodeProps) { // props에 타입을 적용합니다.
   const Icon = nodeIcons[node.type] || MessageSquare;
 
-  const handleConnectionStart = (e, outputIndex = 0) => {
+  const handleConnectionStart = (e: React.MouseEvent<HTMLDivElement, MouseEvent>, outputIndex = 0) => {
     e.preventDefault();
     e.stopPropagation();
+
+    const nodeElement = e.currentTarget.closest('.dialogue-node');
+    if (!nodeElement) return;
     
-    const nodeRect = e.currentTarget.closest('.dialogue-node').getBoundingClientRect();
     const handleRect = e.currentTarget.getBoundingClientRect();
-    
-    onStartConnection(node.node_id, { 
-      x: handleRect.left + handleRect.width / 2, 
-      y: handleRect.top + handleRect.height / 2 
+
+    onStartConnection(node.node_id, {
+      x: handleRect.left + handleRect.width / 2,
+      y: handleRect.top + handleRect.height / 2
     }, outputIndex);
   };
 
-  const handleConnectionEnd = (e) => {
+  const handleConnectionEnd = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (isConnecting) {
       onCompleteConnection(node.node_id);
     }
@@ -76,25 +112,14 @@ export default function DialogueNode({
     if (node.type === 'end') return "Conversation End";
     if (node.type === 'choice') return node.content || "Player Choice";
     if (!node.content) return `Click to edit ${node.type}`;
-    
+
     const maxLength = 50;
-    return node.content.length > maxLength 
+    return node.content.length > maxLength
       ? node.content.substring(0, maxLength) + "..."
       : node.content;
   };
 
   const canDelete = node.type !== 'start' && node.type !== 'end';
-
-  // Calculate choice output positions
-  const getChoiceOutputs = () => {
-    if (node.type !== 'choice' || !choices.length) return [];
-    
-    return choices.map((choice, index) => ({
-      index,
-      text: choice,
-      position: index // Will be used to calculate Y position
-    }));
-  };
 
   return (
     <motion.div
@@ -111,14 +136,14 @@ export default function DialogueNode({
       className="dialogue-node"
       onMouseDown={onMouseDown}
     >
-      <Card 
+      <Card
         className={`w-64 transition-all duration-200 border-2 select-none ${
-          isSelected 
-            ? 'border-indigo-400 shadow-lg shadow-indigo-500/20' 
+          isSelected
+            ? 'border-indigo-400 shadow-lg shadow-indigo-500/20'
             : 'border-slate-700 hover:border-slate-600'
         } ${
-          node.type === 'start' || node.type === 'end' 
-            ? 'bg-slate-800/70' 
+          node.type === 'start' || node.type === 'end'
+            ? 'bg-slate-800/70'
             : 'bg-slate-800/90'
         } backdrop-blur-sm`}
       >
@@ -236,14 +261,14 @@ export default function DialogueNode({
           </div>
 
           {/* Conditions & Consequences Indicators */}
-          {(node.conditions?.length > 0 || node.consequences?.length > 0) && (
+          {(node.conditions && node.conditions.length > 0 || node.consequences && node.consequences.length > 0) && (
             <div className="flex gap-2 mt-3 pt-3 border-t border-slate-700">
-              {node.conditions?.length > 0 && (
+              {node.conditions && node.conditions.length > 0 && (
                 <Badge variant="outline" className="text-xs border-yellow-500/30 text-yellow-400">
                   {node.conditions.length} condition{node.conditions.length > 1 ? 's' : ''}
                 </Badge>
               )}
-              {node.consequences?.length > 0 && (
+              {node.consequences && node.consequences.length > 0 && (
                 <Badge variant="outline" className="text-xs border-orange-500/30 text-orange-400">
                   {node.consequences.length} action{node.consequences.length > 1 ? 's' : ''}
                 </Badge>
@@ -255,3 +280,4 @@ export default function DialogueNode({
     </motion.div>
   );
 }
+

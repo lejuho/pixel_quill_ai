@@ -13,9 +13,44 @@ import React, { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export default function DialogueSimulator({ nodes, characters, onClose }) {
-  const [currentNodeId, setCurrentNodeId] = useState(null);
-  const [dialogueHistory, setDialogueHistory] = useState([]);
+// --- TypeScript 타입 정의 시작 ---
+
+// DialogueNode.tsx와 호환되는 Node 데이터 타입을 정의합니다.
+// 시뮬레이터에서 사용되는 추가 속성(character_id, choices)을 포함합니다.
+interface DialogueNodeData {
+  node_id: string;
+  type: 'start' | 'dialogue' | 'choice' | 'condition' | 'action' | 'end';
+  content?: string;
+  character_id?: string;
+  choices?: string[];
+  connections?: string[];
+}
+
+// Character 데이터 타입을 정의합니다.
+interface CharacterData {
+  id: string;
+  name: string;
+}
+
+// 대화 기록 항목의 타입을 정의합니다.
+interface DialogueHistoryEntry {
+  type: 'dialogue' | 'choice';
+  content: string;
+  speaker: string;
+}
+
+// DialogueSimulator 컴포넌트가 받는 props의 타입을 정의합니다.
+interface DialogueSimulatorProps {
+  nodes: DialogueNodeData[];
+  characters: CharacterData[];
+  onClose: () => void;
+}
+
+// --- TypeScript 타입 정의 끝 ---
+
+export default function DialogueSimulator({ nodes, characters, onClose }: DialogueSimulatorProps) {
+  const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
+  const [dialogueHistory, setDialogueHistory] = useState<DialogueHistoryEntry[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
 
   useEffect(() => {
@@ -27,23 +62,16 @@ export default function DialogueSimulator({ nodes, characters, onClose }) {
     }
   }, [nodes]);
 
-  const getCurrentNode = () => {
+  const getCurrentNode = (): DialogueNodeData | undefined => {
     return nodes.find(node => node.node_id === currentNodeId);
   };
 
-  const getCharacterById = (characterId) => {
+  const getCharacterById = (characterId?: string): CharacterData | undefined => {
+    if (!characterId) return undefined;
     return characters.find(c => c.id === characterId);
   };
 
-  const getNextNode = (connectionIndex = 0) => {
-    const currentNode = getCurrentNode();
-    if (!currentNode || !currentNode.connections) return null;
-    
-    const nextNodeId = currentNode.connections[connectionIndex];
-    return nodes.find(node => node.node_id === nextNodeId);
-  };
-
-  const handleChoice = (choiceIndex) => {
+  const handleChoice = (choiceIndex: number) => {
     const currentNode = getCurrentNode();
     if (!currentNode) return;
 
@@ -72,7 +100,7 @@ export default function DialogueSimulator({ nodes, characters, onClose }) {
       const character = getCharacterById(currentNode.character_id);
       setDialogueHistory(prev => [...prev, {
         type: 'dialogue',
-        content: currentNode.content,
+        content: currentNode.content || "",
         speaker: character?.name || 'Unknown'
       }]);
     }
@@ -97,7 +125,7 @@ export default function DialogueSimulator({ nodes, characters, onClose }) {
 
   const currentNode = getCurrentNode();
 
-  if (!currentNode) {
+  if (!isSimulating && !currentNode) {
     return (
       <div className="p-6 text-center">
         <h3 className="text-white text-lg mb-4">No start node found</h3>
@@ -108,6 +136,12 @@ export default function DialogueSimulator({ nodes, characters, onClose }) {
       </div>
     );
   }
+  
+  if (!currentNode) {
+    // 로딩 중이거나 ID가 잘못된 경우
+    return null;
+  }
+
 
   return (
     <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
@@ -144,7 +178,7 @@ export default function DialogueSimulator({ nodes, characters, onClose }) {
           <CardContent className="space-y-2 max-h-32 overflow-y-auto">
             {dialogueHistory.map((entry, index) => (
               <div key={index} className="flex items-start gap-2 text-sm">
-                <Badge 
+                <Badge
                   variant={entry.type === 'dialogue' ? 'default' : 'secondary'}
                   className="mt-0.5"
                 >
@@ -182,7 +216,7 @@ export default function DialogueSimulator({ nodes, characters, onClose }) {
                   {getCharacterById(currentNode.character_id)?.name || 'Unknown Character'}
                 </span>
               </div>
-              
+
               <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
                 <p className="text-slate-200 leading-relaxed">
                   {currentNode.content || 'No dialogue text'}
@@ -205,7 +239,7 @@ export default function DialogueSimulator({ nodes, characters, onClose }) {
                 <MessageSquare className="w-5 h-5 text-purple-400" />
                 <span className="text-purple-300 font-medium">Player Choice</span>
               </div>
-              
+
               {currentNode.content && (
                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 mb-4">
                   <p className="text-slate-200 leading-relaxed">{currentNode.content}</p>

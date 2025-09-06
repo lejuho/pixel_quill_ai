@@ -11,7 +11,7 @@ import {
   X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Character, GameVariable, Lore } from "@/entities/all";
+import { Character as CharacterEntity, GameVariable as GameVariableEntity, Lore as LoreEntity } from "@/entities/all";
 import React, { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,13 +21,59 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+// --- START: 타입 정의 추가 ---
+
+// 각 데이터의 형태를 정의합니다. 실제 all.ts 파일과 일치해야 합니다.
+interface Character {
+  id: string;
+  name: string;
+  description?: string;
+  personality?: string;
+  voice_style?: string;
+  role?: string;
+  relationships?: string;
+  backstory?: string;
+  tags?: string[];
+}
+
+interface Lore {
+  id: string;
+  title: string;
+  content: string;
+}
+
+interface GameVariable {
+  id: string;
+  name: string;
+  display_name?: string;
+}
+
+// 편집 중인 아이템의 상태를 위한 타입
+type EditingItem = {
+  type: 'character';
+  data?: Character;
+} | {
+  type: 'lore';
+  data?: Lore;
+} | {
+  type: 'variable';
+  data?: GameVariable;
+} | null;
+
+type CodexItemType = 'character' | 'lore' | 'variable';
+type CodexItemData = Partial<Character> | Partial<Lore> | Partial<GameVariable>;
+
+// --- END: 타입 정의 추가 ---
+
+
 export default function Codex() {
   const [activeTab, setActiveTab] = useState("characters");
-  const [characters, setCharacters] = useState([]);
-  const [lore, setLore] = useState([]);
-  const [variables, setVariables] = useState([]);
+  // useState에 명시적으로 타입을 지정해줍니다.
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [lore, setLore] = useState<Lore[]>([]);
+  const [variables, setVariables] = useState<GameVariable[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [editingItem, setEditingItem] = useState(null);
+  const [editingItem, setEditingItem] = useState<EditingItem>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -37,46 +83,50 @@ export default function Codex() {
   const loadAllData = async () => {
     try {
       const [charactersData, loreData, variablesData] = await Promise.all([
-        Character.list("-created_date"),
-        Lore.list("-created_date"),
-        GameVariable.list("-created_date")
+        CharacterEntity.list("-created_date"),
+        LoreEntity.list("-created_date"),
+        GameVariableEntity.list("-created_date")
       ]);
       
-      setCharacters(charactersData);
-      setLore(loreData);
-      setVariables(variablesData);
+      setCharacters(charactersData as Character[]);
+      setLore(loreData as Lore[]);
+      setVariables(variablesData as GameVariable[]);
     } catch (error) {
       console.error("Error loading codex data:", error);
     }
     setIsLoading(false);
   };
 
-  const handleSave = async (type, data) => {
+  // 함수 매개변수에 타입을 지정합니다.
+  const handleSave = async (type: CodexItemType, data: CodexItemData) => {
     try {
-      let result;
-      if (editingItem?.id) {
+      let result: Character | Lore | GameVariable | undefined;
+      // 논리 오류 수정: editingItem.id -> editingItem.data.id
+      const existingItemId = editingItem?.data?.id;
+
+      if (existingItemId) {
         // Update existing
         if (type === 'character') {
-          result = await Character.update(editingItem.id, data);
-          setCharacters(prev => prev.map(item => item.id === editingItem.id ? { ...item, ...data } : item));
+          result = await CharacterEntity.update(existingItemId, data);
+          setCharacters(prev => prev.map(item => item.id === existingItemId ? { ...item, ...data } as Character : item));
         } else if (type === 'lore') {
-          result = await Lore.update(editingItem.id, data);
-          setLore(prev => prev.map(item => item.id === editingItem.id ? { ...item, ...data } : item));
+          result = await LoreEntity.update(existingItemId, data);
+          setLore(prev => prev.map(item => item.id === existingItemId ? { ...item, ...data } as Lore : item));
         } else if (type === 'variable') {
-          result = await GameVariable.update(editingItem.id, data);
-          setVariables(prev => prev.map(item => item.id === editingItem.id ? { ...item, ...data } : item));
+          result = await GameVariableEntity.update(existingItemId, data);
+          setVariables(prev => prev.map(item => item.id === existingItemId ? { ...item, ...data } as GameVariable : item));
         }
       } else {
         // Create new
         if (type === 'character') {
-          result = await Character.create(data);
-          setCharacters(prev => [result, ...prev]);
+          result = await CharacterEntity.create(data);
+          setCharacters(prev => [result as Character, ...prev]);
         } else if (type === 'lore') {
-          result = await Lore.create(data);
-          setLore(prev => [result, ...prev]);
+          result = await LoreEntity.create(data);
+          setLore(prev => [result as Lore, ...prev]);
         } else if (type === 'variable') {
-          result = await GameVariable.create(data);
-          setVariables(prev => [result, ...prev]);
+          result = await GameVariableEntity.create(data);
+          setVariables(prev => [result as GameVariable, ...prev]);
         }
       }
       setEditingItem(null);
@@ -85,16 +135,17 @@ export default function Codex() {
     }
   };
 
-  const handleDelete = async (type, id) => {
+  // 함수 매개변수에 타입을 지정합니다.
+  const handleDelete = async (type: CodexItemType, id: string) => {
     try {
       if (type === 'character') {
-        await Character.delete(id);
+        await CharacterEntity.delete(id);
         setCharacters(prev => prev.filter(item => item.id !== id));
       } else if (type === 'lore') {
-        await Lore.delete(id);
+        await LoreEntity.delete(id);
         setLore(prev => prev.filter(item => item.id !== id));
       } else if (type === 'variable') {
-        await GameVariable.delete(id);
+        await GameVariableEntity.delete(id);
         setVariables(prev => prev.filter(item => item.id !== id));
       }
     } catch (error) {
@@ -102,8 +153,8 @@ export default function Codex() {
     }
   };
 
-  const CharacterEditor = ({ character }) => {
-    const [formData, setFormData] = useState(character || {
+  const CharacterEditor = ({ character }: { character?: Character }) => {
+    const [formData, setFormData] = useState<Partial<Character>>(character || {
       name: "",
       description: "",
       personality: "",
@@ -133,14 +184,14 @@ export default function Codex() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               placeholder="Character name"
-              value={formData.name}
+              value={formData.name || ''}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               className="bg-slate-700 border-slate-600 text-white"
             />
             
             <Select 
-              value={formData.role} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}
+              value={formData.role || 'other'} 
+              onValueChange={(value: string) => setFormData(prev => ({ ...prev, role: value }))}
             >
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                 <SelectValue />
@@ -160,28 +211,28 @@ export default function Codex() {
 
           <Textarea
             placeholder="Physical description and background"
-            value={formData.description}
+            value={formData.description || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
             className="bg-slate-700 border-slate-600 text-white"
           />
 
           <Textarea
             placeholder="Personality traits and quirks"
-            value={formData.personality}
+            value={formData.personality || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, personality: e.target.value }))}
             className="bg-slate-700 border-slate-600 text-white"
           />
 
           <Textarea
             placeholder="How the character speaks and their speech patterns"
-            value={formData.voice_style}
+            value={formData.voice_style || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, voice_style: e.target.value }))}
             className="bg-slate-700 border-slate-600 text-white"
           />
 
           <Textarea
             placeholder="Character's history and motivations"
-            value={formData.backstory}
+            value={formData.backstory || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, backstory: e.target.value }))}
             className="bg-slate-700 border-slate-600 text-white"
           />
@@ -393,3 +444,4 @@ export default function Codex() {
     </div>
   );
 }
+

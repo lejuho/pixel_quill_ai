@@ -8,7 +8,7 @@ import {
   Settings
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Character, DialogueGraph, DialogueNode } from "@/entities/all";
+import { Character as CharacterEntity, DialogueGraph as DialogueGraphEntity, DialogueNode as DialogueNodeEntity } from "@/entities/all";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import React, { useCallback, useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,11 +19,42 @@ import { Input } from "@/components/ui/input";
 import NodeEditor from "../components/dialogue/NodeEditor";
 import { motion } from "framer-motion";
 
+// --- START: 타입 정의 추가 ---
+
+interface DialogueGraph {
+  id: string;
+  title: string;
+  description?: string;
+  category?: string;
+}
+
+interface DialogueNode {
+  id?: string;
+  graph_id: string;
+  node_id: string;
+  type: 'start' | 'dialogue' | 'choice' | 'condition' | 'action' | 'end';
+  position: { x: number; y: number };
+  content?: string;
+  character_id?: string;
+  connections?: string[];
+  conditions?: any[];
+  consequences?: any[];
+  choices?: string[];
+}
+
+interface Character {
+  id: string;
+  name: string;
+  // Add other character properties if needed for the simulator
+}
+
+// --- END: 타입 정의 추가 ---
+
 export default function DialogueEditor() {
-  const [currentGraph, setCurrentGraph] = useState(null);
-  const [graphs, setGraphs] = useState([]);
-  const [nodes, setNodes] = useState([]);
-  const [characters, setCharacters] = useState([]); // Added characters state
+  const [currentGraph, setCurrentGraph] = useState<DialogueGraph | null>(null);
+  const [graphs, setGraphs] = useState<DialogueGraph[]>([]);
+  const [nodes, setNodes] = useState<DialogueNode[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showTestDialog, setShowTestDialog] = useState(false);
@@ -33,14 +64,14 @@ export default function DialogueEditor() {
     category: "character_interaction"
   });
 
-  const loadGraph = useCallback(async (graphId) => {
+  const loadGraph = useCallback(async (graphId: string) => {
     try {
-      const graphList = await DialogueGraph.filter({ id: graphId });
-      const graphNodes = await DialogueNode.filter({ graph_id: graphId });
+      const graphList = await DialogueGraphEntity.filter({ id: graphId });
+      const graphNodes = await DialogueNodeEntity.filter({ graph_id: graphId });
       
-      if (graphList.length > 0) {
-        setCurrentGraph(graphList[0]);
-        setNodes(graphNodes);
+      if (Array.isArray(graphList) && graphList.length > 0) {
+        setCurrentGraph(graphList[0] as DialogueGraph);
+        setNodes(graphNodes as DialogueNode[]);
       }
     } catch (error) {
       console.error("Error loading graph:", error);
@@ -49,19 +80,18 @@ export default function DialogueEditor() {
 
   const loadGraphs = useCallback(async () => {
     try {
-      const fetchedGraphs = await DialogueGraph.list("-created_date");
-      setGraphs(fetchedGraphs);
-    } catch (error) {
+      const fetchedGraphs = await DialogueGraphEntity.list("-created_date");
+      setGraphs(fetchedGraphs as DialogueGraph[]);
+    } catch (error) { // <<-- 여기 중괄호가 빠져 있었습니다.
       console.error("Error loading graphs:", error);
     }
     setIsLoading(false);
   }, []);
 
-  // New function to load characters
   const loadCharacters = useCallback(async () => {
     try {
-      const fetchedCharacters = await Character.list();
-      setCharacters(fetchedCharacters);
+      const fetchedCharacters = await CharacterEntity.list();
+      setCharacters(fetchedCharacters as Character[]);
     } catch (error) {
       console.error("Error loading characters:", error);
     }
@@ -77,33 +107,30 @@ export default function DialogueEditor() {
 
   useEffect(() => {
     loadGraphs();
-    loadCharacters(); // Call loadCharacters on mount
+    loadCharacters();
     checkUrlParams();
-  }, [loadGraphs, loadCharacters, checkUrlParams]); // Added loadCharacters to dependencies
+  }, [loadGraphs, loadCharacters, checkUrlParams]);
 
   const createNewGraph = async () => {
-    if (!newGraphData.title.trim()) return;
+    if (!newGraphData.title.trim() || !newGraphData.category) return;
 
     try {
-      const graph = await DialogueGraph.create(newGraphData);
+      const graph = await DialogueGraphEntity.create(newGraphData);
       
-      // Create initial start node
-      const startNode = {
+      const startNodeData: Partial<DialogueNode> = {
         graph_id: graph.id,
         node_id: `start_${Date.now()}`,
         type: 'start',
         position: { x: 100, y: 200 },
         content: 'Start',
         connections: [],
-        conditions: [],
-        consequences: []
       };
 
-      const savedStartNode = await DialogueNode.create(startNode);
+      const savedStartNode = await DialogueNodeEntity.create(startNodeData);
       
-      setCurrentGraph(graph);
-      setNodes([savedStartNode]);
-      setGraphs(prev => [graph, ...prev]);
+      setCurrentGraph(graph as DialogueGraph);
+      setNodes([savedStartNode as DialogueNode]);
+      setGraphs(prev => [graph as DialogueGraph, ...prev]);
       setNewGraphData({ title: "", description: "", category: "character_interaction" });
     } catch (error) {
       console.error("Error creating graph:", error);
@@ -115,20 +142,25 @@ export default function DialogueEditor() {
 
     setIsSaving(true);
     try {
-      const savePromises = nodes.map(node => {
+      // Create a deep copy of nodes to avoid mutation issues
+      const nodesToSave = JSON.parse(JSON.stringify(nodes));
+
+      const savePromises = nodesToSave.map((node: DialogueNode) => {
+        // The entity methods might not need the id in the payload
+        const payload: Partial<DialogueNode> = { ...node };
+        delete payload.id; 
+
         if (node.id) {
-          return DialogueNode.update(node.id, node);
+          return DialogueNodeEntity.update(node.id, payload);
         } else {
-          return DialogueNode.create(node);
+          return DialogueNodeEntity.create(payload);
         }
       });
 
       const savedNodes = await Promise.all(savePromises);
       
-      setNodes(savedNodes.map((savedNode, index) => ({
-        ...nodes[index],
-        id: savedNode.id || nodes[index].id
-      })));
+      // Ensure the state is updated with fresh data from the server
+      setNodes(savedNodes as DialogueNode[]);
 
     } catch (error) {
       console.error("Error saving graph:", error);
@@ -188,7 +220,7 @@ export default function DialogueEditor() {
                   />
                   <Select 
                     value={newGraphData.category} 
-                    onValueChange={(value) => setNewGraphData(prev => ({ ...prev, category: value }))}
+                    onValueChange={(value: string) => setNewGraphData(prev => ({ ...prev, category: value }))}
                   >
                     <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                       <SelectValue />
@@ -296,13 +328,16 @@ export default function DialogueEditor() {
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="flex items-center justify-center"
               >
-                <Save className="w-4 h-4 mr-2" />
+                <Save className="w-4 h-4" />
               </motion.div>
             ) : (
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="w-4 h-4" />
             )}
-            Save
+            <span className="ml-2">
+              {isSaving ? "Saving..." : "Save"}
+            </span>
           </Button>
         </div>
       </div>
@@ -325,7 +360,7 @@ export default function DialogueEditor() {
           </DialogHeader>
           <DialogueSimulator 
             nodes={nodes}
-            characters={characters} // Passed characters prop
+            characters={characters}
             onClose={() => setShowTestDialog(false)}
           />
         </DialogContent>
@@ -333,3 +368,4 @@ export default function DialogueEditor() {
     </div>
   );
 }
+

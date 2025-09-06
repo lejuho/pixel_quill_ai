@@ -88,7 +88,21 @@ const textTypes = [
   }
 ];
 
-export default function TextTypeSelector({ selectedType, onTypeSelect }) {
+export interface TextType {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ElementType; // Lucide 아이콘과 같은 컴포넌트 타입
+  color: string;
+}
+
+interface TextTypeSelectorProps {
+  selectedType: string | null;
+  onTypeSelect: (id: string) => void;
+  textTypes: TextType[]; // textTypes도 props로 받는다고 가정
+}
+
+export default function TextTypeSelector({ selectedType, onTypeSelect,textTypes }: TextTypeSelectorProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">

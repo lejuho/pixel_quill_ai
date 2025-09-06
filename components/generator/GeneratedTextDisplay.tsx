@@ -17,6 +17,19 @@ import { Input } from "@/components/ui/input";
 import React from "react";
 import { Textarea } from "@/components/ui/textarea";
 
+interface GeneratedTextDisplayProps {
+  generatedText: string;
+  title: string;
+  onTitleChange: (value: string) => void;
+  isGenerating: boolean;
+  onRegenerate: () => void;
+  onSave: (text: string) => void;
+  onCopy: () => void;
+  onExport: () => void;
+  isSaving: boolean;
+  showSaveSuccess: boolean;
+}
+
 export default function GeneratedTextDisplay({ 
   generatedText,
   title,
@@ -28,7 +41,7 @@ export default function GeneratedTextDisplay({
   onExport,
   isSaving,
   showSaveSuccess
-}) {
+}: GeneratedTextDisplayProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editedText, setEditedText] = React.useState(generatedText);
 
